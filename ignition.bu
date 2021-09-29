@@ -1,7 +1,0 @@
-variant: fcos
-version: 1.4.0
-passwd:
-  users:
-    - name: core
-      ssh_authorized_keys:
-        - sh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPSz1utEY02p7aS45EJwL9Unv3jnA3FxvDHF2c82p7IK root@fedora
