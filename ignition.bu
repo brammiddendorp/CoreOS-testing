@@ -7,4 +7,8 @@ users:
       ssh_authorized_keys:
         - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPSz1utEY02p7aS45EJwL9Unv3jnA3FxvDHF2c82p7IK root@fedora
     - name: levi
+       ssh_authorized_keys:
+         - ssh-ed25519 
     - name: bram
+       ssh_authorized_keys:
+         - ssh-ed25519 
