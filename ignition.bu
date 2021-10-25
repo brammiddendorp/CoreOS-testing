@@ -3,12 +3,12 @@ version: 1.4.0
 passwd:
   users:
     - name: core
-    password_hash: $y$j9T$/MhYF4yspmhZBDVfFJBDv1$Um5vdt.hC9e1ZW6evEhqDY.P4figghyXF5C7tPFQZz/
-    ssh_authorized_keys:
-      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPSz1utEY02p7aS45EJwL9Unv3jnA3FxvDHF2c82p7IK root@fedora
+      password_hash: $y$j9T$/MhYF4yspmhZBDVfFJBDv1$Um5vdt.hC9e1ZW6evEhqDY.P4figghyXF5C7tPFQZz/
+      ssh_authorized_keys:
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPSz1utEY02p7aS45EJwL9Unv3jnA3FxvDHF2c82p7IK root@fedora
     - name: levi
-    ssh_authorized_keys
-      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPSz1utEY02p7aS45EJwL9Unv3jnA3FxvDHF2c82p7IK root@fedora
+      ssh_authorized_keys:
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPSz1utEY02p7aS45EJwL9Unv3jnA3FxvDHF2c82p7IK root@fedora
     - name: bram
-    ssh_authorized_keys:
-      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPSz1utEY02p7aS45EJwL9Unv3jnA3FxvDHF2c82p7IK root@fedora
+      ssh_authorized_keys:
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPSz1utEY02p7aS45EJwL9Unv3jnA3FxvDHF2c82p7IK root@fedora
