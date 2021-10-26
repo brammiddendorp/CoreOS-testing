@@ -12,3 +12,177 @@ passwd:
     - name: bram
       ssh_authorized_keys:
         - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPSz1utEY02p7aS45EJwL9Unv3jnA3FxvDHF2c82p7IK root@fedora
+systemd:
+  units:
+    - name: cgroups-v2-karg.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Switch To cgroups v2
+        After=systemd-machine-id-commit.service
+        ConditionKernelCommandLine=systemd.unified_cgroup_hierarchy
+        ConditionPathExists=!/var/lib/cgroups-v2-karg.stamp
+        [Service]       
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/bin/rpm-ostree kargs --delete=systemd.unified_cgroup_hierarchy
+--delete=systemd.unified_cgroup_hierarchy
+        ExecStart=/bin/touch /var/lib/cgroups-v2-karg.stamp
+        ExecStart=/bin/systemctl --no-block reboot
+        [Install]
+        WantedBy=multi-user.target
+
+- name: podmanpod.service       
+  enabled: true       
+  contents: |       
+    [Unit]       
+    Description=Creates a podman pod to run the matrix services.       
+    After=cgroups-v2-karg.service network-online.target       
+    Wants=After=cgroups-v2-karg.service network-online.target       
+    [Service]       
+    Type=oneshot       
+    RemainAfterExit=yes       
+    ExecStart=sh -c 'podman pod exists matrix || podman pod create -n matrix -p 80:80 -p 443:443 -p 8448:8448'       
+    [Install]       
+    WantedBy=multi-user.target
+
+- name: certbot-firstboot.service
+  enabled: true
+  contents: |
+    [Unit]
+    Description=Run certbot to get certificates
+    ConditionPathExists=!/var/srv/matrix/letsencrypt-certs/archive
+    After=podmanpod.service network-online.target nginx-http.service
+    Wants=network-online.target
+    Requires=podmanpod.service nginx-http.service
+
+    [Service]
+    Type=oneshot
+    ExecStart=/bin/podman run \
+                  --name=certbot \
+                  --pod=matrix \
+                  --rm \
+                  --cap-drop all \
+                  --volume /var/srv/matrix/letsencrypt-webroot:/var/lib/letsencrypt:rw,z \
+                  --volume /var/srv/matrix/letsencrypt-certs:/etc/letsencrypt:rw,z \
+                  docker.io/certbot/certbot:latest \
+                  --agree-tos --webroot certonly
+
+    [Install]
+    WantedBy=multi-user.target
+
+- name: nginx.service
+  enabled: true
+  contents: |
+    [Unit]
+    Description=Run the nginx server
+    After=podmanpod.service network-online.target certbot-firstboot.service
+    Wants=network-online.target
+    Requires=podmanpod.service certbot-firstboot.service
+
+    [Service]
+    ExecStartPre=/bin/podman pull docker.io/nginx:stable
+    ExecStart=/bin/podman run \
+                  --name=nginx \
+                  --pull=always \
+                  --pod=matrix \
+                  --rm \
+                  --volume /var/srv/matrix/nginx/nginx.conf:/etc/nginx/nginx.conf:ro,z \
+                  --volume /var/srv/matrix/nginx/dhparam:/etc/nginx/dhparam:ro,z \
+                  --volume /var/srv/matrix/letsencrypt-webroot:/var/www:ro,z \
+                  --volume /var/srv/matrix/letsencrypt-certs:/etc/letsencrypt:ro,z \
+                  --volume /var/srv/matrix/well-known:/var/well-known:ro,z \
+                  docker.io/nginx:stable
+    ExecStop=/bin/podman rm --force --ignore nginx
+
+    [Install]
+    WantedBy=multi-user.target
+
+- name: certbot.timer
+  enabled: true
+  contents: |
+    [Unit]
+    Description=Weekly check for certificates renewal
+    [Timer]
+    OnCalendar=Sun --* 02:00:00 
+    Persistent=true
+    [Install]
+    WantedBy=timers.target
+- name: certbot.service
+  enabled: false
+  contents: |
+  [Unit]
+  Description=Let's Encrypt certificate renewal
+  ConditionPathExists=/var/srv/matrix/letsencrypt-certs/archive
+  After=podmanpod.service network-online.target
+  Wants=network-online.target
+  Requires=podmanpod.service
+  [Service]
+  Type=oneshot
+  ExecStart=/bin/podman run \
+                --name=certbot \
+                --pod=matrix \
+                --rm \
+                --cap-drop all \
+                --volume /var/srv/matrix/letsencrypt-webroot:/var/lib/letsencrypt:rw,z \
+                --volume /var/srv/matrix/letsencrypt-certs:/etc/letsencrypt:rw,z \
+                docker.io/certbot/certbot:latest \
+                renew
+  ExecStartPost=/bin/systemctl restart --no-block nginx.service
+
+- name: synapse.service       
+  enabled: true       
+  contents: |       
+    [Unit]       
+    Description=Run the synapse service.       
+    After=podmanpod.service network-online.target                       
+    Wants=network-online.target       
+    Requires=podmanpod.service
+    [Service]       
+    ExecStart=/bin/podman run \
+                  --name=synapse \       
+                  --pull=always  \       
+                  --read-only \       
+                  --pod=matrix \       
+                  --rm \       
+                  -v /var/srv/matrix/synapse:/data:z \       
+                  docker.io/matrixdotorg/synapse:v1.24.0       
+    ExecStop=/bin/podman rm --force --ignore synapse       
+    [Install]            
+    WantedBy=multi-user.target
+
+
+storage:
+  directories:
+    - path: /var/srv/matrix
+      mode: 0700
+    - path: /var/srv/matrix/synapse/media_store
+      mode: 0777
+    - path: /var/srv/matrix/postgres
+    - path: /var/srv/matrix/letsencrypt-webroot
+  trees:
+    - local: synapse
+      path: /var/srv/matrix/synapse
+    - local: nginx
+      path: /var/srv/matrix/nginx
+    - local: nginx-http
+      path: /var/srv/matrix/nginx-http
+    - local: letsencrypt-certs
+      path: /var/srv/matrix/letsencrypt-certs
+    - local: well-known
+      path: /var/srv/matrix/well-known
+    - local: element-web
+      path: /var/srv/matrix/element-web
+  files:
+    - path: /etc/postgresql_synapse
+      contents:
+        local: postgresql_synapse
+      mode: 0700
+
+[updates]
+strategy = "periodic"
+
+[[updates.periodic.window]]
+days = [ "Mon", "Tue", "Wed", "Thu", "Fri" ]
+start_time = "02:00"
+length_minutes = 120
