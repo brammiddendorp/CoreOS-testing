@@ -26,7 +26,6 @@ systemd:
         Type=oneshot
         RemainAfterExit=yes
         ExecStart=/bin/rpm-ostree kargs --delete=systemd.unified_cgroup_hierarchy
---delete=systemd.unified_cgroup_hierarchy
         ExecStart=/bin/touch /var/lib/cgroups-v2-karg.stamp
         ExecStart=/bin/systemctl --no-block reboot
         [Install]
